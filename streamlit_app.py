@@ -81,14 +81,19 @@ if menu == "Pruebas de hipótesis":
     sample_size = st.slider("Tamaño de la muestra", min_value=min_slider, max_value=max_slider, value=min_slider, step=1)
 
     if sample_size < total:
-        sample_df = df.sample(n=sample_size, random_state=42).sort_index()
+        sample_df = df.sample(n=sample_size, random_state=42).sort_index().reset_index(drop=True)
     else:
         numeric_cols_all = df.select_dtypes(include=np.number).columns.tolist()
         if numeric_cols_all:
-            sample_df = df.sort_values(by=numeric_cols_all[0]).head(sample_size)
+            sample_df = (
+                df.sort_values(by=numeric_cols_all[0])
+                    .head(sample_size)
+                    .reset_index(drop=True)
+            )
         else:
-            sample_df = df.head(sample_size)
+            sample_df = df.head(sample_size).reset_index(drop=True)
 
+    # Mostrar
     st.subheader("Muestra seleccionada")
     st.write(f"Registros mostrados: {sample_df.shape[0]}")
     st.dataframe(sample_df)
@@ -176,6 +181,11 @@ if menu == "Regresión lineal":
     df = pd.read_csv(uploaded)
     st.subheader("Head de los datos")
     st.dataframe(df.head())
+    st.subheader("Fórmulas utilizadas (Mínimos Cuadrados)")
+    st.latex(r"b = r \cdot \frac{S_y}{S_x}")
+    st.latex(r"a = \bar{Y} - b\bar{X}")
+    st.latex(r"\hat{Y} = a + bX")
+
 
     numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
     if len(numeric_cols) < 2:
@@ -190,10 +200,11 @@ if menu == "Regresión lineal":
     max_slider = total
     sample_size = st.slider("Tamaño de la muestra para regresión", min_value=min_slider, max_value=max_slider, value=min_slider, step=1, key="reg_slider")
 
+    # seleccionar muestra y resetear índices para mostrar limpia
     if sample_size < total:
-        sample_df = df.sample(n=sample_size, random_state=123)
+        sample_df = df.sample(n=sample_size, random_state=123).reset_index(drop=True)
     else:
-        sample_df = df.sort_values(by=col_x).head(sample_size)
+        sample_df = df.sort_values(by=col_x).head(sample_size).reset_index(drop=True)
 
     st.write(f"Usando {sample_df.shape[0]} observaciones para la regresión")
     st.dataframe(sample_df[[col_x, col_y]].head(50))
@@ -201,49 +212,86 @@ if menu == "Regresión lineal":
     csv_bytes = sample_df[[col_x, col_y]].to_csv(index=False).encode('utf-8')
     st.download_button("Descargar muestra (CSV) - regresión", data=csv_bytes, file_name="muestra_regresion.csv", mime="text/csv")
 
+    # === usar la función linear_regression para todos los valores del modelo ===
     reg = linear_regression(sample_df[col_x], sample_df[col_y])
     if not reg:
         st.error("No se pudo ajustar la regresión (pocos datos).")
         st.stop()
 
-    st.subheader("Resultados de la regresión")
-    st.write(f"Intercepto (a) = {reg['intercept']:.6f}")
-    st.write(f"Pendiente (b) = {reg['slope']:.6f}")
-    st.write(f"r (Pearson) = {reg['r']:.6f}")
-    st.write(f"R² = {reg['r2']:.6f}")
+    intercept = reg['intercept']
+    slope = reg['slope']
+    r_val = reg['r']
+    r2_val = reg['r2']
+    stderr = reg['stderr']
+    n = reg['n']
+
+    st.subheader("Resultados de la regresión (calculados por linear_regression)")
+    st.write(f"Intercepto (a) = {intercept:.6f}")
+    st.write(f"Pendiente (b) = {slope:.6f}")
+    st.write(f"r (Pearson) = {r_val:.6f}")
+    st.write(f"R² = {r2_val:.6f}")
     st.write(f"P-valor (pendiente) = {reg['pvalue']:.6g}")
     st.write("Resumen del modelo (texto):")
     st.code(reg["summary"])
 
-    clase = classification_by_r(reg['r'])
+    clase = classification_by_r(r_val)
     st.markdown(f"## Clasificación de correlación: **{clase}**")
 
-    st.subheader("Gráfica: dispersión y recta de regresión")
+    # Gráfica: dispersión y recta calculada por la función
+    st.subheader("Gráfica: dispersión y recta de regresión (usando intercept y slope de la función)")
     fig, ax = plt.subplots(figsize=(8,5))
     sns.scatterplot(x=sample_df[col_x], y=sample_df[col_y], ax=ax)
-    xs = np.linspace(sample_df[col_x].min(), sample_df[col_x].max(), 100)
-    ys = reg['intercept'] + reg['slope'] * xs
-    ax.plot(xs, ys, color='red')
+    xs_line = np.linspace(sample_df[col_x].min(), sample_df[col_x].max(), 200)
+    ys_line = intercept + slope * xs_line
+    ax.plot(xs_line, ys_line, color='red', label='Recta (función)')
     ax.set_xlabel(col_x)
     ax.set_ylabel(col_y)
+    ax.legend()
     st.pyplot(fig)
 
+    # Predicción interactiva usando intercept y slope devueltos por la función
+    st.subheader("Predicción interactiva (usar resultados de linear_regression)")
+    x_input = st.number_input(f"Ingrese un valor de {col_x} para predecir {col_y}:", value=float(sample_df[col_x].median()))
+    y_pred = intercept + slope * x_input
+    st.markdown("### Ecuación usada:")
+    st.latex(fr"\hat{{Y}} = {intercept:.4f} + {slope:.4f} X")
+    st.write(f"**Predicción Ŷ para {col_x} = {x_input} : {y_pred:.4f}**")
+
+    # Test de significancia de la pendiente y gráfico t con colas
     st.subheader("Test: ¿es la pendiente significativa?")
     alpha = st.number_input("Nivel de significancia α (regresión)", min_value=0.0001, max_value=0.5, value=0.05, step=0.01, format="%.4f", key="alpha_reg")
-    n = reg["n"]
+
     dfree = n - 2
-    t_stat = reg['slope'] / reg['stderr'] if reg['stderr'] != 0 else float('nan')
+    t_stat = slope / stderr if stderr != 0 else float('nan')
     pval = 2 * stats.t.sf(abs(t_stat), dfree)
+
     st.write(f"t = {t_stat:.4f}  (df = {dfree})")
     st.write(f"P-valor (two-sided) = {pval:.6f}")
+
     conclusion = "Rechazamos H0 (pendiente = 0)" if pval < alpha else "No rechazamos H0"
     st.markdown(f"### Conclusión: **{conclusion}** (α = {alpha})")
 
-    st.subheader("Distribución t (n-2) y estadístico")
+    # -------- GRÁFICA ---------
+    st.subheader("Distribución t (n-2) y zonas de rechazo")
     fig, ax = plt.subplots(figsize=(8,4))
-    xs = np.linspace(-4, 4, 1000)
-    ys = stats.t.pdf(xs, dfree)
-    ax.plot(xs, ys)
-    ax.axvline(t_stat, color='red', linestyle='--', label=f"t = {t_stat:.3f}")
+
+    xs_t = np.linspace(-4, 4, 1500)
+    ys_t = stats.t.pdf(xs_t, dfree)
+    ax.plot(xs_t, ys_t, label="Distribución t")
+
+    # Valor crítico bilateral
+    t_crit = stats.t.ppf(1 - alpha/2, dfree)
+    x_left = xs_t[xs_t < -t_crit]
+    x_right = xs_t[xs_t > t_crit]
+    ax.fill_between(x_left, 0, stats.t.pdf(x_left, dfree), color="orange", alpha=0.5)
+    ax.fill_between(x_right, 0, stats.t.pdf(x_right, dfree), color="orange", alpha=0.5)
+
+    # Líneas críticas y estadístico
+    ax.axvline(-t_crit, color='orange', linestyle='--', label=f"± t crítico = {t_crit:.3f}")
+    ax.axvline(t_crit, color='orange', linestyle='--')
+    ax.axvline(t_stat, color='red', linestyle='--', linewidth=2, label=f"t = {t_stat:.3f}")
+
+    ax.set_xlabel("t")
+    ax.set_ylabel("densidad")
     ax.legend()
     st.pyplot(fig)
