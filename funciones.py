@@ -14,12 +14,21 @@ def estadisticas_basicas(series: pd.Series) -> Dict[str, float]:
     std_poblacional = x.std(ddof=0) if n > 0 else float("nan")
     return {"n": int(n), "mean": float(media), "std_m": float(std_muestral if not np.isnan(std_muestral) else 0.0), "std_p": float(std_poblacional if not np.isnan(std_poblacional) else 0.0)}
 
-def pearson_r(x: pd.Series, y: pd.Series) -> float:
+def pearson_r(x: pd.Series, y: pd.Series, n:int) -> float:
     """Calcula r de Pearson (ignora NaNs alineando índices)."""
     df = pd.concat([x, y], axis=1).dropna()
     if df.shape[0] < 2:
         return float("nan")
-    return float(df.iloc[:,0].corr(df.iloc[:,1]))
+    x = df.iloc[:,0].astype(float)
+    y = df.iloc[:,1].astype(float)
+    xbar = x.mean()
+    ybar = y.mean()
+    num = ((x - xbar) * (y - ybar)).sum()
+    denom = (n-1) * x.std(ddof=1) * y.std(ddof=1)
+    if denom == 0:
+        return float("nan")
+    r = num / denom
+    return float(r)
 
 def linear_regression(x: pd.Series, y: pd.Series) -> Dict:
     """
@@ -33,12 +42,11 @@ def linear_regression(x: pd.Series, y: pd.Series) -> Dict:
     model = sm.OLS(df.iloc[:,1], X).fit()
     slope = float(model.params[1])
     intercept = float(model.params[0])
-    r = float(df.iloc[:,0].corr(df.iloc[:,1]))
-    r2 = float(model.rsquared)
+    r = pearson_r(df.iloc[:,0], df.iloc[:,1], int(df.shape[0]))
     pvalue = float(model.pvalues[1])
     stderr = float(model.bse[1])
     summary = model.summary().as_text()
-    return {"slope": slope, "intercept": intercept, "r": r, "r2": r2, "pvalue": pvalue, "stderr": stderr, "n": int(df.shape[0]), "summary": summary}
+    return {"slope": slope, "intercept": intercept, "r": r, "pvalue": pvalue, "stderr": stderr, "n": int(df.shape[0]), "summary": summary}
 
 def classification_by_r(r_value: float) -> str:
     """Clasifica la fuerza de la correlación según |r|"""

@@ -221,15 +221,13 @@ if menu == "Regresión lineal":
     intercept = reg['intercept']
     slope = reg['slope']
     r_val = reg['r']
-    r2_val = reg['r2']
     stderr = reg['stderr']
     n = reg['n']
 
-    st.subheader("Resultados de la regresión (calculados por linear_regression)")
+    st.subheader("Resultados de la regresión")
     st.write(f"Intercepto (a) = {intercept:.6f}")
     st.write(f"Pendiente (b) = {slope:.6f}")
     st.write(f"r (Pearson) = {r_val:.6f}")
-    st.write(f"R² = {r2_val:.6f}")
     st.write(f"P-valor (pendiente) = {reg['pvalue']:.6g}")
     st.write("Resumen del modelo (texto):")
     st.code(reg["summary"])
