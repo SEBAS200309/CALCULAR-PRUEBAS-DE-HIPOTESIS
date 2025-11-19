@@ -3,16 +3,16 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import statsmodels.api as sm
-from typing import Tuple, Dict
+from typing import Dict
 
 def estadisticas_basicas(series: pd.Series) -> Dict[str, float]:
     """Calcula media, desviación estándar (muestral y poblacional), n"""
     x = series.dropna().astype(float)
     n = x.size
-    media = x.mean()
-    std_muestral = x.std(ddof=1)
-    std_poblacional = x.std(ddof=0)
-    return {"n": int(n), "mean": float(media), "std_m": float(std_muestral), "std_p": float(std_poblacional)}
+    media = x.mean() if n > 0 else float("nan")
+    std_muestral = x.std(ddof=1) if n > 1 else float("nan")
+    std_poblacional = x.std(ddof=0) if n > 0 else float("nan")
+    return {"n": int(n), "mean": float(media), "std_m": float(std_muestral if not np.isnan(std_muestral) else 0.0), "std_p": float(std_poblacional if not np.isnan(std_poblacional) else 0.0)}
 
 def pearson_r(x: pd.Series, y: pd.Series) -> float:
     """Calcula r de Pearson (ignora NaNs alineando índices)."""
@@ -24,7 +24,7 @@ def pearson_r(x: pd.Series, y: pd.Series) -> float:
 def linear_regression(x: pd.Series, y: pd.Series) -> Dict:
     """
     Ajuste de regresión lineal simple usando statsmodels.
-    Devuelve slope, intercept, r, r2, pvalue_slope, stderr_slope, summary (texto opcional)
+    Devuelve slope, intercept, r, r2, pvalue_slope, stderr_slope, n, summary.
     """
     df = pd.concat([x, y], axis=1).dropna()
     if df.shape[0] < 2:
