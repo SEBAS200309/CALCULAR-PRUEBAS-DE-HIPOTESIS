@@ -4,5 +4,5 @@ __pycache__/
 .ipynb_checkpoints
 .vscode/
 .DS_Store
-entorno_virtual/
+entorno/
 
