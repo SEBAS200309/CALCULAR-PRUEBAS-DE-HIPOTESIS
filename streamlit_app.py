@@ -228,7 +228,7 @@ if menu == "Regresión lineal":
     st.write(f"Intercepto (a) = {intercept:.6f}")
     st.write(f"Pendiente (b) = {slope:.6f}")
     st.write(f"r (Pearson) = {r_val:.6f}")
-    st.write(f"P-valor (pendiente) = {reg['pvalue']:.6g}")
+    st.write(f"Valor P = {reg['pvalue']:.6g}")
     st.write("Resumen del modelo (texto):")
     st.code(reg["summary"])
 
